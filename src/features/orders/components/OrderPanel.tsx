@@ -98,7 +98,7 @@ export const OrderPanel: React.FC<Props> = ({ table, bill, onSendOrder, onCloseT
           </p>
         </div>
         <button
-          className="btn btn-outline btn--sm btn--danger-outline"
+          className="order-close-btn"
           onClick={onCloseTable}
           title="Đóng bàn và lưu vào lịch sử"
         >
@@ -110,15 +110,15 @@ export const OrderPanel: React.FC<Props> = ({ table, bill, onSendOrder, onCloseT
         {/* ══════════ LEFT: menu browser ═══════════════ */}
         <div className="order-menu-col">
           <div className="order-menu-header">
-            <div className="search-box">
-              <span className="search-icon">🔍</span>
+            <div className="order-search-box">
+              <span className="order-search-icon">🔍</span>
               <input
-                className="search-input"
+                className="order-search-input"
                 placeholder="Tìm món…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              {search && <button className="search-clear" onClick={() => setSearch("")}>✕</button>}
+              {search && <button className="order-search-clear" onClick={() => setSearch("")}>✕</button>}
             </div>
             <div className="order-cat-tabs">
               <button
@@ -193,7 +193,7 @@ export const OrderPanel: React.FC<Props> = ({ table, bill, onSendOrder, onCloseT
                       </div>
                       <div className="cart-item-qty">
                         <button className="qty-btn" onClick={() => updateCart(c.item.id, "quantity", c.quantity - 1)}>−</button>
-                        <span className="qty-val">{c.quantity}</span>
+                        <span className="order-qty-val">{c.quantity}</span>
                         <button className="qty-btn" onClick={() => updateCart(c.item.id, "quantity", c.quantity + 1)}>+</button>
                       </div>
                       <div className="cart-item-right">
@@ -208,7 +208,7 @@ export const OrderPanel: React.FC<Props> = ({ table, bill, onSendOrder, onCloseT
                   <p className="order-subtotal">
                     Tạm tính: <strong>{fmt(cartTotal)}</strong>
                   </p>
-                  <button className="btn btn-primary" onClick={handleSend}>
+                  <button className="order-send-btn" onClick={handleSend}>
                     📤 Gửi order ({cart.length} món)
                   </button>
                 </div>

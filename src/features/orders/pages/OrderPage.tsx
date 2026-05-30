@@ -31,18 +31,18 @@ export const OrderPage: React.FC = () => {
   };
 
   return (
-    <div className="page-wrapper">
-      <div className="page-header">
+    <div className="ord-page">
+      <div className="ord-header">
         <div>
-          <h1 className="page-title">🍻 Gọi món tại bàn</h1>
-          <p className="page-subtitle">Chọn bàn để mở hoặc tiếp tục hóa đơn</p>
+          <h1 className="ord-title">Gọi món tại bàn</h1>
+          <p className="ord-subtitle">Chọn bàn để mở hoặc tiếp tục hóa đơn tạm tính theo thời gian thực</p>
         </div>
-        <div style={{ display: "flex", gap: "var(--sp-3)" }}>
-          <span className="stat-chip stat-chip--blue">
-            🟦 {inUseCount} bàn đang dùng
+        <div className="ord-stat-pills">
+          <span className="ord-stat-pill ord-stat-pill--blue">
+            {inUseCount} bàn đang dùng
           </span>
-          <span className="stat-chip stat-chip--green">
-            🟩 {emptyCount} bàn trống
+          <span className="ord-stat-pill ord-stat-pill--green">
+            {emptyCount} bàn trống
           </span>
         </div>
       </div>

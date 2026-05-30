@@ -8,7 +8,6 @@ type NavigationItem = {
 
 const navigationMap: Record<UserRole, NavigationItem[]> = {
   manager: [
-    { label: "Dashboard",  to: "/manager/dashboard",    icon: "📊" },
     { label: "Đặt bàn",   to: "/manager/reservations", icon: "📅" },
     { label: "Nhập kho",  to: "/manager/inventory",    icon: "📦" },
     { label: "Doanh thu", to: "/manager/revenue",      icon: "💰" },
@@ -18,11 +17,9 @@ const navigationMap: Record<UserRole, NavigationItem[]> = {
     { label: "Gọi món",  to: "/manager/orders",        icon: "🍻" }
   ],
   accountant: [
-    { label: "Dashboard",  to: "/accountant/dashboard", icon: "📊" },
     { label: "Doanh thu", to: "/accountant/revenue",   icon: "💰" }
   ],
   staff: [
-    { label: "Dashboard",  to: "/staff/dashboard",    icon: "📊" },
     { label: "Đặt bàn",   to: "/staff/reservations", icon: "📅" },
     { label: "Nhập kho",  to: "/staff/inventory",    icon: "📦" },
     { label: "Hồ sơ & Ca", to: "/staff/staff",       icon: "🗓️" },
@@ -30,7 +27,6 @@ const navigationMap: Record<UserRole, NavigationItem[]> = {
     { label: "Gọi món",  to: "/staff/orders",       icon: "🍻" }
   ],
   customer: [
-    { label: "Dashboard",  to: "/customer/dashboard",    icon: "🏠" },
     { label: "Đặt bàn",   to: "/customer/reservations", icon: "📅" }
   ]
 };
