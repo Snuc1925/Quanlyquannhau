@@ -7,13 +7,6 @@ import { getDefaultPathByRole } from "@/app/layout/navigation";
 
 type LocationState = { from?: { pathname?: string } };
 
-const demoHints = [
-  { role: "Quản lý",  credentials: "manager / manager123" },
-  { role: "Kế toán",  credentials: "accountant / accountant123" },
-  { role: "Nhân viên", credentials: "staff / staff123" },
-  { role: "Khách hàng", credentials: "customer / customer123" }
-];
-
 export function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -109,51 +102,6 @@ export function LoginPage() {
                 {loading ? "Đang đăng nhập..." : "Đăng nhập →"}
               </Button>
             </form>
-          </div>
-
-          {/* Demo hints */}
-          <div style={{
-            padding: "var(--sp-4) var(--sp-6)",
-            borderTop: "1px solid var(--c-gray-100)",
-            background: "var(--c-gray-25)"
-          }}>
-            <p style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-semi)", color: "var(--c-gray-500)", marginBottom: "var(--sp-3)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              Tài khoản demo
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--sp-2)" }}>
-              {demoHints.map((hint) => (
-                <button
-                  key={hint.role}
-                  type="button"
-                  onClick={() => {
-                    const [u, p] = hint.credentials.split(" / ");
-                    setUsername(u);
-                    setPassword(p);
-                  }}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-start",
-                    padding: "var(--sp-2) var(--sp-3)",
-                    border: "1px solid var(--c-gray-200)",
-                    borderRadius: "var(--r-sm)",
-                    background: "var(--c-white)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    transition: "border-color 0.1s, background 0.1s"
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--c-primary-300)")}
-                  onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--c-gray-200)")}
-                >
-                  <span style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-semi)", color: "var(--c-primary-600)" }}>
-                    {hint.role}
-                  </span>
-                  <span style={{ fontSize: "var(--fs-xs)", color: "var(--c-gray-400)", marginTop: 1 }}>
-                    {hint.credentials}
-                  </span>
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </div>

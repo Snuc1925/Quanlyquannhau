@@ -45,23 +45,21 @@ export const MenuItemForm: React.FC<Props> = ({ initial, onSave, onClose }) => {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-box menu-form-modal" onClick={(e) => e.stopPropagation()}>
-        {/* header */}
+      <div className="modal mnu-form-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2 className="modal-title">
+          <h2 className="mnu-form-title">
             {initial ? "✏️ Sửa món" : "➕ Thêm món mới"}
           </h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <button className="modal-close" onClick={onClose} type="button">✕</button>
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
-          <div className="modal-body menu-form-body">
-            {/* emoji + name row */}
-            <div className="form-row-2">
-              <div className="field-group" style={{ flex: "0 0 100px" }}>
-                <label className="field-label">Icon / Emoji</label>
+          <div className="modal-body mnu-form-body">
+            <div className="mnu-form-grid mnu-form-grid--head">
+              <div className="field-group">
+                <label className="field-label">Icon / Emoji *</label>
                 <input
-                  className={`field-input text-center text-2xl ${errors.emoji ? "field-input--error" : ""}`}
+                  className={`field-input mnu-emoji-input ${errors.emoji ? "field-input--error" : ""}`}
                   value={form.emoji}
                   onChange={(e) => set("emoji", e.target.value)}
                   placeholder="🍺"
@@ -69,7 +67,7 @@ export const MenuItemForm: React.FC<Props> = ({ initial, onSave, onClose }) => {
                 />
                 {errors.emoji && <p className="field-error">{errors.emoji}</p>}
               </div>
-              <div className="field-group" style={{ flex: 1 }}>
+              <div className="field-group">
                 <label className="field-label">Tên món *</label>
                 <input
                   className={`field-input ${errors.name ? "field-input--error" : ""}`}
@@ -81,16 +79,15 @@ export const MenuItemForm: React.FC<Props> = ({ initial, onSave, onClose }) => {
               </div>
             </div>
 
-            {/* category */}
             <div className="field-group">
               <label className="field-label">Danh mục</label>
-              <div className="cat-radio-group">
+              <div className="mnu-category-grid">
                 {(Object.keys(CATEGORY_META) as MenuCategory[]).map((k) => {
                   const m = CATEGORY_META[k];
                   return (
                     <label
                       key={k}
-                      className={`cat-radio ${form.category === k ? "cat-radio--active" : ""}`}
+                      className={`mnu-category-chip ${form.category === k ? "mnu-category-chip--active" : ""}`}
                       style={
                         form.category === k
                           ? { color: m.color, background: m.bg, borderColor: m.color }
@@ -105,15 +102,15 @@ export const MenuItemForm: React.FC<Props> = ({ initial, onSave, onClose }) => {
                         onChange={() => set("category", k)}
                         style={{ display: "none" }}
                       />
-                      {m.icon} {m.label}
+                      <span>{m.icon}</span>
+                      <span>{m.label}</span>
                     </label>
                   );
                 })}
               </div>
             </div>
 
-            {/* price + availability row */}
-            <div className="form-row-2">
+            <div className="mnu-form-grid">
               <div className="field-group">
                 <label className="field-label">Giá bán (₫) *</label>
                 <input
@@ -127,19 +124,20 @@ export const MenuItemForm: React.FC<Props> = ({ initial, onSave, onClose }) => {
                 />
                 {errors.price && <p className="field-error">{errors.price}</p>}
               </div>
+
               <div className="field-group">
                 <label className="field-label">Trạng thái</label>
-                <div className="avail-toggle-row">
+                <div className="mnu-status-row">
                   <button
                     type="button"
-                    className={`avail-btn ${form.available ? "avail-btn--on" : ""}`}
+                    className={`mnu-status-btn ${form.available ? "mnu-status-btn--on" : ""}`}
                     onClick={() => set("available", true)}
                   >
                     ✅ Còn hàng
                   </button>
                   <button
                     type="button"
-                    className={`avail-btn ${!form.available ? "avail-btn--off" : ""}`}
+                    className={`mnu-status-btn ${!form.available ? "mnu-status-btn--off" : ""}`}
                     onClick={() => set("available", false)}
                   >
                     ❌ Hết hàng
@@ -148,11 +146,10 @@ export const MenuItemForm: React.FC<Props> = ({ initial, onSave, onClose }) => {
               </div>
             </div>
 
-            {/* description */}
             <div className="field-group">
               <label className="field-label">Mô tả</label>
               <textarea
-                className="field-input field-textarea"
+                className="field-input field-textarea mnu-textarea"
                 rows={3}
                 value={form.description}
                 onChange={(e) => set("description", e.target.value)}
@@ -161,7 +158,7 @@ export const MenuItemForm: React.FC<Props> = ({ initial, onSave, onClose }) => {
             </div>
           </div>
 
-          <div className="modal-footer">
+          <div className="modal-footer mnu-form-footer">
             <button type="button" className="btn btn-outline" onClick={onClose}>
               Huỷ
             </button>

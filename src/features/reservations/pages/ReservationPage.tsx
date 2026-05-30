@@ -1,51 +1,59 @@
 import { useEffect, useMemo, useState } from "react";
-import { Input, StatusView } from "@/components/ui";
 import { useToast } from "@/app/providers/ToastProvider";
 import { TableMap } from "@/features/reservations/components/TableMap";
 import { PreOrderMenu } from "@/features/reservations/components/PreOrderMenu";
-import { ReservationList } from "@/features/reservations/components/ReservationList";
 import { useReservationStore } from "@/features/reservations/store/reservationStore";
-import type { PaymentMethod } from "@/features/reservations/types";
-
-/* ────────────────────────────────────────────────────────
-   Constants
-──────────────────────────────────────────────────────── */
-const STEPS = [
-  { id: 1, label: "Thời Gian" },
-  { id: 2, label: "Chọn Bàn" },
-  { id: 3, label: "Gọi Món" },
-  { id: 4, label: "Xác Nhận" },
-];
+import type { PaymentMethod, Reservation } from "@/features/reservations/types";
 
 const paymentOptions: { label: string; value: PaymentMethod; icon: string }[] = [
-  { label: "Tiền mặt",     value: "cash",    icon: "💵" },
-  { label: "Chuyển khoản", value: "bank",    icon: "🏦" },
-  { label: "Thẻ",          value: "card",    icon: "💳" },
-  { label: "Ví điện tử",   value: "ewallet", icon: "📱" },
+  { label: "Tiền mặt", value: "cash", icon: "💵" },
+  { label: "Chuyển khoản", value: "bank", icon: "🏦" },
+  { label: "Thẻ", value: "card", icon: "💳" },
+  { label: "Ví điện tử", value: "ewallet", icon: "📱" }
 ];
+
+const statusMeta: Record<Reservation["status"], { label: string; className: string }> = {
+  CONFIRMED: { label: "✅ Đã đặt", className: "resv-badge-confirmed" },
+  PENDING_DEPOSIT: { label: "⏳ Chờ cọc", className: "resv-badge-pending" },
+  CANCELLED: { label: "❌ Đã hủy", className: "resv-badge-cancelled" },
+  EXPIRED: { label: "⚠️ Quá hạn", className: "resv-badge-expired" }
+};
 
 const DEPOSIT_RATE = 0.3;
 
-/* ────────────────────────────────────────────────────────
-   Component
-──────────────────────────────────────────────────────── */
 export function ReservationPage() {
   const {
-    tables, reservations, menuItems, search,
-    availableTableIds, selectedTableId, hold,
-    contact, paymentMethod, preOrders,
-    searchError, actionError,
-    updateSearch, runSearch, selectTable,
-    updateContact, setPaymentMethod, updatePreOrder,
-    submitBooking, cancelReservation, sweepExpiries,
+    tables,
+    reservations,
+    menuItems,
+    search,
+    availableTableIds,
+    selectedTableId,
+    hold,
+    contact,
+    paymentMethod,
+    preOrders,
+    searchError,
+    actionError,
+    updateSearch,
+    runSearch,
+    selectTable,
+    updateContact,
+    setPaymentMethod,
+    updatePreOrder,
+    resetDraft,
+    submitBooking,
+    cancelReservation,
+    sweepExpiries
   } = useReservationStore();
 
   const { pushToast } = useToast();
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [nowTs, setNowTs] = useState(Date.now());
+  const [listQuery, setListQuery] = useState("");
 
-  /* countdown timer */
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowTs(Date.now());
@@ -54,410 +62,419 @@ export function ReservationPage() {
     return () => window.clearInterval(timer);
   }, [sweepExpiries]);
 
+  const tableCodeMap = useMemo(
+    () => new Map(tables.map((table) => [table.id, table.code])),
+    [tables]
+  );
+
+  const selectedTable = useMemo(
+    () => tables.find((table) => table.id === selectedTableId) ?? null,
+    [tables, selectedTableId]
+  );
+
+  const preOrderTotal = useMemo(() => {
+    const priceMap = new Map(menuItems.map((item) => [item.id, item.price]));
+    return preOrders.reduce(
+      (sum, po) => sum + (priceMap.get(po.menuItemId) ?? 0) * po.quantity,
+      0
+    );
+  }, [menuItems, preOrders]);
+
+  const sortedReservations = useMemo(
+    () =>
+      [...reservations].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [reservations]
+  );
+
+  const filteredReservations = useMemo(() => {
+    const q = listQuery.trim().toLowerCase();
+    if (!q) return sortedReservations;
+    return sortedReservations.filter((reservation) => {
+      const tableCode = tableCodeMap.get(reservation.tableId) ?? reservation.tableId;
+      return (
+        reservation.contact.fullName.toLowerCase().includes(q) ||
+        reservation.contact.phone.toLowerCase().includes(q) ||
+        tableCode.toLowerCase().includes(q)
+      );
+    });
+  }, [listQuery, sortedReservations, tableCodeMap]);
+
   const holdSecondsLeft = useMemo(() => {
     if (!hold) return 0;
-    return Math.max(0, Math.floor((new Date(hold.expiresAt).getTime() - nowTs) / 1000));
+    return Math.max(
+      0,
+      Math.floor((new Date(hold.expiresAt).getTime() - nowTs) / 1000)
+    );
   }, [hold, nowTs]);
 
   const holdLabel = useMemo(() => {
-    const m = Math.floor(holdSecondsLeft / 60);
-    const s = holdSecondsLeft % 60;
-    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    const mins = Math.floor(holdSecondsLeft / 60);
+    const secs = holdSecondsLeft % 60;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   }, [holdSecondsLeft]);
 
-  const selectedTable = useMemo(
-    () => tables.find((t) => t.id === selectedTableId) ?? null,
-    [selectedTableId, tables]
-  );
+  const formatMoney = (amount: number) => `${amount.toLocaleString("vi-VN")}đ`;
+  const formatDateTime = (dateTime: string) =>
+    new Date(dateTime).toLocaleString("vi-VN", { hour12: false });
 
-  /* pre-order totals */
-  const preOrderTotal = useMemo(() => {
-    const itemMap = new Map(menuItems.map((m) => [m.id, m.price]));
-    return preOrders.reduce(
-      (sum, po) => sum + (itemMap.get(po.menuItemId) ?? 0) * po.quantity,
-      0
-    );
-  }, [preOrders, menuItems]);
-
-  const depositAmount = Math.round(preOrderTotal * DEPOSIT_RATE);
-
-  /* step guards */
-  const canGoStep2 = availableTableIds.length > 0;
-  const canGoStep3 = Boolean(selectedTableId);
-  const canGoStep4 = Boolean(selectedTableId);
-
-  const handleNext = () => {
-    if (step === 1) {
-      if (!canGoStep2) { runSearch(); return; }
-      setStep(2);
-    } else if (step === 2) {
-      if (!canGoStep3) {
-        pushToast({ kind: "error", title: "Chưa chọn bàn", description: "Vui lòng chọn một bàn trước khi tiếp tục." });
-        return;
-      }
-      setStep(3);
-    } else if (step === 3) {
-      setStep(4);
-    }
+  const openCreateModal = () => {
+    resetDraft();
+    setStep(1);
+    setIsModalOpen(true);
   };
 
-  const handleBack = () => setStep((s) => Math.max(1, s - 1));
+  const closeCreateModal = () => {
+    setIsModalOpen(false);
+    setStep(1);
+    resetDraft();
+  };
+
+  const handleNext = () => {
+    if (step === 1 && !selectedTableId) {
+      if (!availableTableIds.length) {
+        runSearch();
+      } else {
+        pushToast({
+          kind: "error",
+          title: "Chưa chọn bàn",
+          description: "Vui lòng chọn một bàn trước khi tiếp tục."
+        });
+      }
+      return;
+    }
+    setStep((current) => Math.min(3, current + 1));
+  };
+
+  const handleBack = () => {
+    setStep((current) => Math.max(1, current - 1));
+  };
 
   const handleSubmit = async () => {
     if (!contact.fullName.trim() || !contact.phone.trim()) {
-      pushToast({ kind: "error", title: "Thiếu thông tin", description: "Vui lòng nhập họ tên và số điện thoại." });
+      pushToast({
+        kind: "error",
+        title: "Thiếu thông tin",
+        description: "Vui lòng nhập họ tên và số điện thoại."
+      });
       return;
     }
+
     setSubmitting(true);
     try {
-      await new Promise((r) => window.setTimeout(r, 700));
+      await new Promise((resolve) => window.setTimeout(resolve, 700));
       const reservation = submitBooking();
       pushToast({
         kind: "success",
         title: "🎉 Đặt bàn thành công!",
-        description: `Mã đặt bàn: ${reservation.id.slice(0, 8).toUpperCase()}`,
+        description: `Mã đặt bàn: ${reservation.id.slice(0, 8).toUpperCase()}`
       });
+      setIsModalOpen(false);
       setStep(1);
     } catch (err) {
       pushToast({
         kind: "error",
-        title: "Không thể xác nhận",
-        description: err instanceof Error ? err.message : "Lỗi không xác định",
+        title: "Không thể xác nhận đặt bàn",
+        description: err instanceof Error ? err.message : "Lỗi không xác định"
       });
     } finally {
       setSubmitting(false);
     }
   };
 
-  /* ── helpers ── */
-  const fmt = (n: number) => n.toLocaleString("vi-VN") + "₫";
-  const fmtDt = (dt: string) => {
-    if (!dt) return "—";
-    try {
-      return new Date(dt).toLocaleString("vi-VN", {
-        day: "2-digit", month: "2-digit", year: "numeric",
-        hour: "2-digit", minute: "2-digit",
-      });
-    } catch { return dt; }
-  };
-
-  /* ── render ── */
   return (
-    <div className="wizard-page">
-      {/* ══ Top header ══════════════════════════════ */}
-      <div className="wizard-page-header">
+    <div className="resv-page">
+      <div className="resv-page-header">
         <div>
-          <h1 className="wizard-page-title">📅 Đặt Bàn Trước</h1>
-          <p className="wizard-page-sub">Chọn bàn, gọi món và thanh toán đặt cọc để sử dụng</p>
+          <h2 className="resv-title">Danh sách đặt bàn</h2>
+          <p className="resv-subtitle">
+            Quản lý lịch đặt bàn trước và tạo đơn đặt bàn mới cho khách
+          </p>
         </div>
+        <button type="button" className="resv-btn-primary" onClick={openCreateModal}>
+          <span className="resv-btn-icon">＋</span>
+          Tạo đơn đặt bàn mới
+        </button>
       </div>
 
-      {/* ══ Stepper ══════════════════════════════════ */}
-      <div className="wizard-stepper">
-        {STEPS.map((s, idx) => {
-          const done = step > s.id;
-          const active = step === s.id;
-          return (
-            <div key={s.id} className={`wizard-step${active ? " active" : ""}${done ? " done" : ""}`}>
-              {idx > 0 && <div className={`wizard-connector${done || active ? " filled" : ""}`} />}
-              <div className="wizard-step-circle">
-                {done ? "✓" : s.id}
-              </div>
-              <span className="wizard-step-label">{s.label}</span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ══ Body: content + summary ══════════════════ */}
-      <div className="wizard-body">
-
-        {/* ── LEFT: step content ──────────────────── */}
-        <div className="wizard-content">
-
-          {/* STEP 1 */}
-          {step === 1 && (
-            <div className="wizard-step-panel">
-              <div className="wizard-step-heading">
-                <span className="wizard-step-num">1</span>
-                <span>Chọn Thời Gian &amp; Số Người</span>
-              </div>
-              <div className="wizard-fields-grid">
-                <div className="field-group">
-                  <label className="field-label">Ngày giờ <span style={{ color: "#ef4444" }}>*</span></label>
-                  <input
-                    type="datetime-local"
-                    className="field-input"
-                    value={search.bookingDateTime}
-                    onChange={(e) => updateSearch({ bookingDateTime: e.target.value })}
-                  />
-                </div>
-                <div className="field-group">
-                  <label className="field-label">Số lượng khách <span style={{ color: "#ef4444" }}>*</span></label>
-                  <input
-                    type="number"
-                    className="field-input"
-                    min={1}
-                    max={20}
-                    value={search.guestCount}
-                    onChange={(e) => updateSearch({ guestCount: Number(e.target.value) || 1 })}
-                  />
-                </div>
-              </div>
-              {searchError && (
-                <div className="wizard-alert wizard-alert--error">
-                  ⚠️ {searchError}
-                </div>
-              )}
-              {canGoStep2 && (
-                <div className="wizard-alert wizard-alert--success">
-                  ✅ Tìm thấy {availableTableIds.length} bàn khả dụng — hãy chọn bàn ở bước tiếp theo
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* STEP 2 */}
-          {step === 2 && (
-            <div className="wizard-step-panel">
-              <div className="wizard-step-heading">
-                <span className="wizard-step-num">2</span>
-                <span>Chọn vị trí bàn</span>
-                {hold && (
-                  <div className="countdown-chip" style={{ marginLeft: "auto" }}>
-                    <span className="dot" />
-                    Giữ bàn còn {holdLabel}
-                  </div>
-                )}
-              </div>
-              <TableMap
-                tables={tables}
-                availableTableIds={availableTableIds}
-                selectedTableId={selectedTableId}
-                onSelect={selectTable}
-              />
-              {actionError && (
-                <div className="wizard-alert wizard-alert--error">
-                  ⚠️ {actionError}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* STEP 3 */}
-          {step === 3 && (
-            <div className="wizard-step-panel">
-              <div className="wizard-step-heading">
-                <span className="wizard-step-num">3</span>
-                <span>Gọi Món Trước (tuỳ chọn)</span>
-              </div>
-              <PreOrderMenu
-                menuItems={menuItems}
-                preOrders={preOrders}
-                onChangeQuantity={updatePreOrder}
-              />
-            </div>
-          )}
-
-          {/* STEP 4 */}
-          {step === 4 && (
-            <div className="wizard-step-panel">
-              <div className="wizard-step-heading">
-                <span className="wizard-step-num">4</span>
-                <span>Thông tin khách hàng</span>
-              </div>
-              <div className="wizard-fields-grid">
-                <div className="field-group">
-                  <label className="field-label">Họ và tên <span style={{ color: "#ef4444" }}>*</span></label>
-                  <input
-                    className="field-input"
-                    placeholder="Nguyễn Văn A"
-                    value={contact.fullName}
-                    onChange={(e) => updateContact({ fullName: e.target.value })}
-                  />
-                </div>
-                <div className="field-group">
-                  <label className="field-label">Số điện thoại <span style={{ color: "#ef4444" }}>*</span></label>
-                  <input
-                    className="field-input"
-                    type="tel"
-                    placeholder="09x xxx xxxx"
-                    value={contact.phone}
-                    onChange={(e) => updateContact({ phone: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="field-group" style={{ marginTop: "var(--sp-3)" }}>
-                <label className="field-label">Ghi chú đặc biệt</label>
-                <textarea
-                  className="field-input field-textarea"
-                  rows={3}
-                  placeholder="Ví dụ: không cay, có bé nhỏ, sinh nhật..."
-                  value={contact.note ?? ""}
-                  onChange={(e) => updateContact({ note: e.target.value })}
-                />
-              </div>
-
-              {/* order detail */}
-              {preOrders.length > 0 && (
-                <div className="wizard-order-detail">
-                  <div className="wizard-order-detail-header">
-                    📋 Chi tiết món đã chọn
-                    <button
-                      className="wizard-link-btn"
-                      onClick={() => setStep(3)}
-                    >
-                      Chỉnh sửa
-                    </button>
-                  </div>
-                  {preOrders
-                    .filter((po) => po.quantity > 0)
-                    .map((po) => {
-                      const item = menuItems.find((m) => m.id === po.menuItemId);
-                      if (!item) return null;
-                      return (
-                        <div key={po.menuItemId} className="wizard-order-line">
-                          <span>#{item.name}</span>
-                          <span>×{po.quantity}</span>
-                          <span>{fmt(item.price * po.quantity)}</span>
-                        </div>
-                      );
-                    })}
-                </div>
-              )}
-
-              {/* payment method */}
-              <div style={{ marginTop: "var(--sp-5)" }}>
-                <p className="field-label" style={{ marginBottom: "var(--sp-3)" }}>
-                  Phương thức thanh toán cọc
-                </p>
-                <div className="payment-grid">
-                  {paymentOptions.map((opt) => (
+      <div className="resv-table-wrap">
+        <div className="resv-table-toolbar">
+          <div className="resv-search-box">
+            <span className="resv-search-icon">🔍</span>
+            <input
+              type="text"
+              placeholder="Tìm theo khách hàng / số điện thoại / mã bàn..."
+              value={listQuery}
+              onChange={(e) => setListQuery(e.target.value)}
+            />
+          </div>
+          <span className="resv-table-count">{filteredReservations.length} đơn</span>
+        </div>
+        <table className="resv-table">
+          <thead>
+            <tr>
+              <th>Khách hàng</th>
+              <th>Bàn</th>
+              <th>Giờ hẹn</th>
+              <th>Số khách</th>
+              <th>Trạng thái</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredReservations.map((reservation) => (
+              <tr key={reservation.id}>
+                <td>
+                  <div className="resv-customer-name">{reservation.contact.fullName}</div>
+                  <div className="resv-customer-phone">{reservation.contact.phone}</div>
+                </td>
+                <td className="resv-table-code">
+                  {tableCodeMap.get(reservation.tableId) ?? reservation.tableId}
+                </td>
+                <td>{formatDateTime(reservation.bookingDateTime)}</td>
+                <td>{reservation.guestCount} người</td>
+                <td>
+                  <span className={`resv-badge ${statusMeta[reservation.status].className}`}>
+                    {statusMeta[reservation.status].label}
+                  </span>
+                </td>
+                <td>
+                  {reservation.status === "CONFIRMED" ? (
                     <button
                       type="button"
-                      key={opt.value}
-                      className={`payment-option${paymentMethod === opt.value ? " selected" : ""}`}
-                      onClick={() => setPaymentMethod(opt.value)}
+                      className="resv-link-cancel"
+                      onClick={() => {
+                        cancelReservation(reservation.id, "Khách chủ động hủy bàn");
+                        pushToast({
+                          kind: "info",
+                          title: "Đã hủy đặt bàn",
+                          description: "Bàn đã được trả về trạng thái Trống."
+                        });
+                      }}
                     >
-                      <span className="payment-icon">{opt.icon}</span>
-                      <span className="payment-label">{opt.label}</span>
+                      Hủy bàn
+                    </button>
+                  ) : (
+                    <span className="resv-cancel-reason">{reservation.cancelReason ?? "—"}</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {filteredReservations.length === 0 ? (
+              <tr>
+                <td className="resv-empty-cell" colSpan={6}>
+                  Chưa có lịch đặt bàn phù hợp
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+
+      <div
+        className={`resv-modal-backdrop${isModalOpen ? " open" : ""}`}
+        onClick={closeCreateModal}
+      >
+        <div className="resv-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="resv-modal-stepper">
+            <div className="resv-stepper-row">
+              <div className="resv-step-item">
+                <div className={`resv-step-circle${step === 1 ? " active" : ""}${step > 1 ? " done" : ""}`}>
+                  {step > 1 ? "✓" : 1}
+                </div>
+              </div>
+              <div className={`resv-step-connector${step > 1 ? " done" : ""}`} />
+              <div className="resv-step-item">
+                <div className={`resv-step-circle${step === 2 ? " active" : ""}${step > 2 ? " done" : ""}`}>
+                  {step > 2 ? "✓" : 2}
+                </div>
+              </div>
+              <div className={`resv-step-connector${step > 2 ? " done" : ""}`} />
+              <div className="resv-step-item">
+                <div className={`resv-step-circle${step === 3 ? " active" : ""}`}>3</div>
+              </div>
+            </div>
+            <div className="resv-step-labels">
+              <span className={`resv-step-label-item${step >= 1 ? " active" : ""}`}>Chọn bàn</span>
+              <span className={`resv-step-label-item${step >= 2 ? " active" : ""}`}>Gọi món</span>
+              <span className={`resv-step-label-item${step >= 3 ? " active" : ""}`}>Xác nhận</span>
+            </div>
+          </div>
+
+          <div className="resv-modal-body">
+            {step === 1 ? (
+              <div className="resv-step-panel">
+                <h3 className="resv-step-heading">Chọn thời gian và bàn</h3>
+                <p className="resv-step-desc">
+                  Nhập thời gian, số khách rồi bấm tìm bàn khả dụng
+                </p>
+
+                <div className="resv-fields-grid">
+                  <div className="resv-form-group">
+                    <label>Ngày giờ đặt bàn *</label>
+                    <input
+                      type="datetime-local"
+                      value={search.bookingDateTime}
+                      onChange={(e) => updateSearch({ bookingDateTime: e.target.value })}
+                    />
+                  </div>
+                  <div className="resv-form-group">
+                    <label>Số khách *</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={search.guestCount}
+                      onChange={(e) => updateSearch({ guestCount: Number(e.target.value) || 1 })}
+                    />
+                  </div>
+                </div>
+
+                <div className="resv-step-actions">
+                  <button type="button" className="resv-btn-next" onClick={runSearch}>
+                    🔍 Tìm bàn khả dụng
+                  </button>
+                  {hold ? (
+                    <span className="resv-hold-chip">Giữ bàn còn {holdLabel}</span>
+                  ) : null}
+                </div>
+
+                {searchError ? <div className="resv-alert resv-alert-error">{searchError}</div> : null}
+                {actionError ? <div className="resv-alert resv-alert-error">{actionError}</div> : null}
+                {!searchError && availableTableIds.length > 0 ? (
+                  <div className="resv-alert resv-alert-success">
+                    Tìm thấy {availableTableIds.length} bàn khả dụng
+                  </div>
+                ) : null}
+
+                <TableMap
+                  tables={tables}
+                  availableTableIds={availableTableIds}
+                  selectedTableId={selectedTableId}
+                  onSelect={selectTable}
+                />
+              </div>
+            ) : null}
+
+            {step === 2 ? (
+              <div className="resv-step-panel">
+                <h3 className="resv-step-heading">Gọi món trước (tuỳ chọn)</h3>
+                <p className="resv-step-desc">
+                  Chọn món trước để bếp chuẩn bị sớm hơn
+                </p>
+                <div className="resv-menu-wrap">
+                  <PreOrderMenu
+                    menuItems={menuItems}
+                    preOrders={preOrders}
+                    onChangeQuantity={updatePreOrder}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {step === 3 ? (
+              <div className="resv-step-panel">
+                <h3 className="resv-step-heading">Xác nhận thông tin</h3>
+                <p className="resv-step-desc">
+                  Nhập thông tin khách và chọn phương thức thanh toán cọc
+                </p>
+
+                <div className="resv-fields-grid">
+                  <div className="resv-form-group">
+                    <label>Họ và tên *</label>
+                    <input
+                      type="text"
+                      value={contact.fullName}
+                      placeholder="Nguyễn Văn A"
+                      onChange={(e) => updateContact({ fullName: e.target.value })}
+                    />
+                  </div>
+                  <div className="resv-form-group">
+                    <label>Số điện thoại *</label>
+                    <input
+                      type="text"
+                      value={contact.phone}
+                      placeholder="09x xxx xxxx"
+                      onChange={(e) => updateContact({ phone: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="resv-form-group">
+                  <label>Ghi chú</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Ví dụ: Không cay, có bé nhỏ..."
+                    value={contact.note ?? ""}
+                    onChange={(e) => updateContact({ note: e.target.value })}
+                  />
+                </div>
+
+                <p className="resv-payment-title">Phương thức thanh toán cọc</p>
+                <div className="resv-payment-grid">
+                  {paymentOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`resv-payment-option${paymentMethod === option.value ? " selected" : ""}`}
+                      onClick={() => setPaymentMethod(option.value)}
+                    >
+                      <span className="resv-payment-icon">{option.icon}</span>
+                      <span>{option.label}</span>
                     </button>
                   ))}
                 </div>
-              </div>
-            </div>
-          )}
 
-          {/* ── Navigation buttons ── */}
-          <div className="wizard-nav">
-            {step > 1 && (
-              <button className="btn btn-outline wizard-back-btn" onClick={handleBack}>
+                <div className="resv-summary-box">
+                  <div className="resv-summary-row">
+                    <span>Bàn đã chọn</span>
+                    <strong>{selectedTable?.code ?? "—"}</strong>
+                  </div>
+                  <div className="resv-summary-row">
+                    <span>Tiền món ăn</span>
+                    <strong>{formatMoney(preOrderTotal)}</strong>
+                  </div>
+                  <div className="resv-summary-row resv-summary-row-total">
+                    <span>Tiền cọc (30%)</span>
+                    <strong>{formatMoney(Math.round(preOrderTotal * DEPOSIT_RATE))}</strong>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="resv-modal-footer">
+            <span className="resv-step-count">Bước {step}/3</span>
+            {step > 1 ? (
+              <button type="button" className="resv-btn-back" onClick={handleBack}>
                 ← Quay lại
               </button>
-            )}
-            <div style={{ flex: 1 }} />
-            {step === 1 && !canGoStep2 && (
-              <button className="btn btn-primary" onClick={() => { runSearch(); }}>
-                🔍 Tìm bàn →
-              </button>
-            )}
-            {step === 1 && canGoStep2 && (
-              <button className="btn btn-primary" onClick={() => setStep(2)}>
-                Tiếp theo →
-              </button>
-            )}
-            {step === 2 && (
+            ) : null}
+            <button type="button" className="resv-btn-cancel" onClick={closeCreateModal}>
+              Hủy
+            </button>
+            {step < 3 ? (
               <button
-                className="btn btn-primary"
-                disabled={!canGoStep3}
+                type="button"
+                className="resv-btn-next"
                 onClick={handleNext}
               >
-                Tiếp theo →
+                Tiếp tục →
               </button>
-            )}
-            {step === 3 && (
-              <button className="btn btn-primary" onClick={() => setStep(4)}>
-                Tiếp theo →
-              </button>
-            )}
-            {step === 4 && (
+            ) : (
               <button
-                className="btn btn-primary"
-                disabled={submitting}
+                type="button"
+                className="resv-btn-submit"
                 onClick={handleSubmit}
+                disabled={submitting}
               >
-                {submitting ? "⏳ Đang xử lý..." : "✅ Xác nhận đặt bàn"}
+                {submitting ? "Đang xử lý..." : "✅ Xác nhận đặt bàn"}
               </button>
             )}
-          </div>
-        </div>
-
-        {/* ── RIGHT: booking summary ──────────────── */}
-        <div className="wizard-summary">
-          <div className="wizard-summary-title">📋 Thông Tin Đặt Bàn</div>
-
-          <div className="wizard-summary-rows">
-            <div className="wizard-summary-row">
-              <span className="ws-label">Ngày &amp; giờ</span>
-              <span className="ws-value">{search.bookingDateTime ? fmtDt(search.bookingDateTime) : "—"}</span>
-            </div>
-            <div className="wizard-summary-row">
-              <span className="ws-label">Số khách</span>
-              <span className="ws-value">{search.guestCount} người</span>
-            </div>
-            <div className="wizard-summary-row">
-              <span className="ws-label">Bàn đã chọn</span>
-              <span className="ws-value">
-                {selectedTable
-                  ? <span className="ws-badge">{selectedTable.code}</span>
-                  : <span className="ws-placeholder">Chưa chọn</span>}
-              </span>
-            </div>
-            <div className="wizard-summary-row">
-              <span className="ws-label">Món đã chọn</span>
-              <span className="ws-value">
-                {preOrders.filter((p) => p.quantity > 0).length > 0
-                  ? `${preOrders.filter((p) => p.quantity > 0).length} loại`
-                  : <span className="ws-placeholder">Chưa có món</span>}
-              </span>
-            </div>
-          </div>
-
-          <div className="wizard-summary-divider" />
-
-          <div className="wizard-summary-totals">
-            <div className="wizard-total-row">
-              <span>Tiền bàn</span>
-              <span>0₫</span>
-            </div>
-            <div className="wizard-total-row">
-              <span>Tiền món ăn</span>
-              <span>{fmt(preOrderTotal)}</span>
-            </div>
-            <div className="wizard-total-row wizard-total-grand">
-              <span>Tổng cộng</span>
-              <span>{fmt(preOrderTotal)}</span>
-            </div>
-          </div>
-
-          <div className="wizard-deposit-box">
-            <span className="ws-label">Tiền cọc (30%)</span>
-            <span className="wizard-deposit-amount">
-              {depositAmount > 0 ? fmt(depositAmount) : "0₫"}
-            </span>
           </div>
         </div>
       </div>
-
-      {/* ══ Reservation list (below wizard) ══════════ */}
-      <ReservationList
-        reservations={reservations}
-        tables={tables}
-        onCancel={(id, reason) => {
-          cancelReservation(id, reason);
-          pushToast({ kind: "info", title: "Đã hủy đặt bàn", description: "Bàn đã được trả về trạng thái Trống." });
-        }}
-      />
     </div>
   );
 }

@@ -1,8 +1,7 @@
-import React, { useState, useMemo } from "react";
-import { useMenuStore } from "../store/menuStore";
-import { MenuItemCard } from "../components/MenuItemCard";
+import React, { useMemo, useState } from "react";
 import { MenuItemForm } from "../components/MenuItemForm";
-import type { MenuItem, MenuCategory } from "../types";
+import { useMenuStore } from "../store/menuStore";
+import type { MenuCategory, MenuItem } from "../types";
 import { CATEGORY_META } from "../types";
 
 type Filter = "all" | MenuCategory;
@@ -19,160 +18,221 @@ export const MenuPage: React.FC = () => {
   const displayed = useMemo(() => {
     return items.filter((item) => {
       const matchCat = filter === "all" || item.category === filter;
-      const matchSearch =
-        search.trim() === "" ||
-        item.name.toLowerCase().includes(search.toLowerCase());
+      const matchSearch = search.trim() === "" || item.name.toLowerCase().includes(search.toLowerCase());
       return matchCat && matchSearch;
     });
-  }, [items, filter, search]);
+  }, [filter, items, search]);
 
-  const catCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: items.length };
-    items.forEach((item) => {
-      counts[item.category] = (counts[item.category] ?? 0) + 1;
-    });
-    return counts;
-  }, [items]);
+  const stats = useMemo(
+    () => ({
+      total: items.length,
+      available: items.filter((item) => item.available).length,
+      unavailable: items.filter((item) => !item.available).length,
+      categories: new Set(items.map((item) => item.category)).size,
+    }),
+    [items],
+  );
 
-  const stats = useMemo(() => ({
-    total: items.length,
-    available: items.filter((i) => i.available).length,
-    unavailable: items.filter((i) => !i.available).length,
-  }), [items]);
+  const openAdd = () => {
+    setEditTarget(undefined);
+    setFormOpen(true);
+  };
 
-  const openAdd = () => { setEditTarget(undefined); setFormOpen(true); };
-  const openEdit = (item: MenuItem) => { setEditTarget(item); setFormOpen(true); };
-  const closeForm = () => { setFormOpen(false); setEditTarget(undefined); };
+  const openEdit = (item: MenuItem) => {
+    setEditTarget(item);
+    setFormOpen(true);
+  };
+
+  const closeForm = () => {
+    setFormOpen(false);
+    setEditTarget(undefined);
+  };
 
   const handleSave = (data: Parameters<typeof addItem>[0]) => {
-    if (editTarget) updateItem(editTarget.id, data);
-    else addItem(data);
+    if (editTarget) {
+      updateItem(editTarget.id, data);
+    } else {
+      addItem(data);
+    }
     closeForm();
   };
 
   const confirmDelete = () => {
-    if (deleteTarget) { deleteItem(deleteTarget.id); setDeleteTarget(null); }
+    if (!deleteTarget) return;
+    deleteItem(deleteTarget.id);
+    setDeleteTarget(null);
   };
 
   return (
-    <div className="page-wrapper">
-      {/* ── Header bar ─────────────────────────────── */}
-      <div className="page-header">
+    <div className="mnu-page">
+      <section className="mnu-header">
         <div>
-          <h1 className="page-title">🍽️ Quản lý thực đơn</h1>
-          <p className="page-subtitle">Thêm, sửa, xóa và cập nhật trạng thái món</p>
+          <h1>Thiết lập thực đơn</h1>
+          <p>Quản lý món ăn, giá bán và trạng thái còn hàng theo một giao diện đồng nhất.</p>
         </div>
-        <button className="btn btn-primary" onClick={openAdd}>
+        <button className="mnu-primary-btn" onClick={openAdd} type="button">
           + Thêm món mới
         </button>
-      </div>
+      </section>
 
-      {/* ── Stats row ──────────────────────────────── */}
-      <div className="stats-row">
-        <div className="stat-card">
-          <span className="stat-icon">🗂️</span>
-          <div><p className="stat-value">{stats.total}</p><p className="stat-label">Tổng món</p></div>
-        </div>
-        <div className="stat-card stat-card--success">
-          <span className="stat-icon">✅</span>
-          <div><p className="stat-value">{stats.available}</p><p className="stat-label">Còn hàng</p></div>
-        </div>
-        <div className="stat-card stat-card--danger">
-          <span className="stat-icon">❌</span>
-          <div><p className="stat-value">{stats.unavailable}</p><p className="stat-label">Hết hàng</p></div>
-        </div>
-      </div>
+      <section className="mnu-stats">
+        <article className="mnu-stat-card">
+          <span className="mnu-stat-icon">🍽️</span>
+          <div>
+            <h3>{stats.total}</h3>
+            <p>Tổng món</p>
+          </div>
+        </article>
+        <article className="mnu-stat-card mnu-stat-card--green">
+          <span className="mnu-stat-icon">✅</span>
+          <div>
+            <h3>{stats.available}</h3>
+            <p>Còn hàng</p>
+          </div>
+        </article>
+        <article className="mnu-stat-card mnu-stat-card--amber">
+          <span className="mnu-stat-icon">⚠️</span>
+          <div>
+            <h3>{stats.unavailable}</h3>
+            <p>Tạm hết</p>
+          </div>
+        </article>
+        <article className="mnu-stat-card mnu-stat-card--blue">
+          <span className="mnu-stat-icon">📂</span>
+          <div>
+            <h3>{stats.categories}</h3>
+            <p>Danh mục</p>
+          </div>
+        </article>
+      </section>
 
-      {/* ── Search + filter ────────────────────────── */}
-      <div className="menu-toolbar">
-        <div className="search-box">
-          <span className="search-icon">🔍</span>
-          <input
-            className="search-input"
-            placeholder="Tìm theo tên món…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {search && (
-            <button className="search-clear" onClick={() => setSearch("")}>✕</button>
-          )}
-        </div>
-
-        <div className="cat-filter-tabs">
-          <button
-            className={`cat-tab ${filter === "all" ? "cat-tab--active" : ""}`}
-            onClick={() => setFilter("all")}
-          >
-            📋 Tất cả <span className="cat-tab__count">{catCounts.all}</span>
-          </button>
-          {(Object.keys(CATEGORY_META) as MenuCategory[]).map((k) => {
-            const m = CATEGORY_META[k];
-            return (
-              <button
-                key={k}
-                className={`cat-tab ${filter === k ? "cat-tab--active" : ""}`}
-                style={filter === k ? { color: m.color, borderBottomColor: m.color } : undefined}
-                onClick={() => setFilter(k)}
-              >
-                {m.icon} {m.label} <span className="cat-tab__count">{catCounts[k] ?? 0}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Grid ───────────────────────────────────── */}
-      {displayed.length === 0 ? (
-        <div className="empty-state">
-          <p className="empty-state__icon">🔍</p>
-          <p className="empty-state__title">Không tìm thấy món nào</p>
-          <p className="empty-state__desc">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
-        </div>
-      ) : (
-        <div className="menu-grid">
-          {displayed.map((item) => (
-            <MenuItemCard
-              key={item.id}
-              item={item}
-              onEdit={openEdit}
-              onDelete={setDeleteTarget}
-              onToggle={toggleAvailability}
+      <section className="mnu-panel">
+        <header className="mnu-panel-head">
+          <div className="mnu-search-wrap">
+            <span>🔎</span>
+            <input
+              type="text"
+              placeholder="Tìm theo tên món..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
             />
-          ))}
+          </div>
+          <div className="mnu-filter-chips">
+            <button
+              type="button"
+              className={filter === "all" ? "mnu-chip mnu-chip--active" : "mnu-chip"}
+              onClick={() => setFilter("all")}
+            >
+              Tất cả
+            </button>
+            {(Object.keys(CATEGORY_META) as MenuCategory[]).map((category) => {
+              const meta = CATEGORY_META[category];
+              const active = filter === category;
+              return (
+                <button
+                  key={category}
+                  type="button"
+                  className={active ? "mnu-chip mnu-chip--active" : "mnu-chip"}
+                  onClick={() => setFilter(category)}
+                  style={active ? { borderColor: meta.color, color: meta.color, background: meta.bg } : undefined}
+                >
+                  {meta.icon} {meta.label}
+                </button>
+              );
+            })}
+          </div>
+        </header>
+
+        <div className="mnu-table-wrap">
+          <table className="mnu-table">
+            <thead>
+              <tr>
+                <th>Món</th>
+                <th>Danh mục</th>
+                <th>Giá</th>
+                <th>Trạng thái</th>
+                <th>Cập nhật</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayed.length === 0 ? (
+                <tr>
+                  <td className="mnu-empty" colSpan={6}>
+                    Không có món phù hợp với bộ lọc hiện tại.
+                  </td>
+                </tr>
+              ) : (
+                displayed.map((item) => {
+                  const meta = CATEGORY_META[item.category];
+                  return (
+                    <tr key={item.id}>
+                      <td>
+                        <div className="mnu-item-main">
+                          <span className="mnu-item-emoji">{item.emoji}</span>
+                          <div>
+                            <p className="mnu-item-name">{item.name}</p>
+                            <p className="mnu-item-desc">{item.description || "Chưa có mô tả"}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="mnu-category-tag" style={{ color: meta.color, backgroundColor: meta.bg }}>
+                          {meta.icon} {meta.label}
+                        </span>
+                      </td>
+                      <td>{item.price.toLocaleString("vi-VN")}đ</td>
+                      <td>
+                        <button
+                          type="button"
+                          className={item.available ? "mnu-status mnu-status--on" : "mnu-status mnu-status--off"}
+                          onClick={() => toggleAvailability(item.id)}
+                        >
+                          {item.available ? "Còn hàng" : "Hết hàng"}
+                        </button>
+                      </td>
+                      <td>{new Date(item.updatedAt).toLocaleString("vi-VN")}</td>
+                      <td>
+                        <div className="mnu-actions">
+                          <button type="button" className="mnu-link-btn" onClick={() => openEdit(item)}>
+                            Sửa
+                          </button>
+                          <button type="button" className="mnu-link-btn mnu-link-btn--danger" onClick={() => setDeleteTarget(item)}>
+                            Xóa
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+      </section>
 
-      {/* ── Add / Edit form modal ──────────────────── */}
-      {formOpen && (
-        <MenuItemForm initial={editTarget} onSave={handleSave} onClose={closeForm} />
-      )}
+      {formOpen && <MenuItemForm initial={editTarget} onClose={closeForm} onSave={handleSave} />}
 
-      {/* ── Delete confirm modal ───────────────────── */}
       {deleteTarget && (
         <div className="modal-backdrop" onClick={() => setDeleteTarget(null)}>
-          <div className="modal-box confirm-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal mnu-delete-modal" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title">🗑️ Xác nhận xóa</h2>
-              <button className="modal-close" onClick={() => setDeleteTarget(null)}>✕</button>
+              <h2 className="modal-title">Xác nhận xóa món</h2>
+              <button className="modal-close" onClick={() => setDeleteTarget(null)} type="button">
+                ✕
+              </button>
             </div>
             <div className="modal-body">
               <p>
-                Bạn có chắc muốn xóa món{" "}
-                <strong>
-                  {deleteTarget.emoji} {deleteTarget.name}
-                </strong>{" "}
-                khỏi thực đơn?
-              </p>
-              <p className="text-danger" style={{ marginTop: "var(--sp-2)", fontSize: "var(--fs-sm)" }}>
-                Hành động này không thể hoàn tác.
+                Bạn chắc chắn muốn xóa <strong>{deleteTarget.emoji} {deleteTarget.name}</strong> khỏi thực đơn?
               </p>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-outline" onClick={() => setDeleteTarget(null)}>
-                Huỷ
+              <button className="btn btn-outline" onClick={() => setDeleteTarget(null)} type="button">
+                Hủy
               </button>
-              <button className="btn btn-danger" onClick={confirmDelete}>
-                🗑️ Xóa món này
+              <button className="btn btn-danger" onClick={confirmDelete} type="button">
+                Xóa món
               </button>
             </div>
           </div>

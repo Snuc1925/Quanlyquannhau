@@ -37,6 +37,7 @@ type ReservationState = {
   updateContact: (payload: Partial<ReservationContact>) => void;
   setPaymentMethod: (method: PaymentMethod) => void;
   updatePreOrder: (menuItemId: string, quantity: number) => void;
+  resetDraft: () => void;
   submitBooking: () => Reservation;
   cancelReservation: (reservationId: string, reason: string) => void;
   sweepExpiries: () => void;
@@ -203,6 +204,24 @@ export const useReservationStore = create<ReservationState>((set, get) => ({
           item.menuItemId === menuItemId ? { ...item, quantity: sanitized } : item
         )
       };
+    });
+  },
+
+  resetDraft: () => {
+    const state = get();
+    set({
+      tables: state.tables.map((table) =>
+        state.hold && table.id === state.hold.tableId ? { ...table, status: "EMPTY" } : table
+      ),
+      search: { bookingDateTime: "", guestCount: 2 },
+      availableTableIds: [],
+      selectedTableId: null,
+      hold: null,
+      contact: emptyContact,
+      paymentMethod: "cash",
+      preOrders: [],
+      searchError: null,
+      actionError: null
     });
   },
 
