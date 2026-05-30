@@ -1,0 +1,99 @@
+:root {
+  /* ── Brand palette ── */
+  --c-primary-900: #0a2214;
+  --c-primary-800: #0e2919;
+  --c-primary-700: #123621;
+  --c-primary-600: #174429;
+  --c-primary-500: #1d5633;
+  --c-primary-400: #226640;
+  --c-primary-300: #3a8a5c;
+  --c-primary-100: #c8e6d4;
+  --c-primary-50:  #edf7f1;
+  --c-primary-200: #a7d7bc;
+
+  --c-amber-600: #cc861f;
+  --c-amber-500: #ffa827;
+  --c-amber-400: #ffbb50;
+  --c-amber-100: #fff0d0;
+  --c-amber-50:  #fffbf0;
+
+  /* ── Neutrals ── */
+  --c-white:   #ffffff;
+  --c-gray-25: #fcfcfd;
+  --c-gray-50: #f8fafc;
+  --c-gray-100:#f1f5f9;
+  --c-gray-150:#eaeff5;
+  --c-gray-200:#e2e8f0;
+  --c-gray-300:#cbd5e1;
+  --c-gray-400:#94a3b8;
+  --c-gray-500:#64748b;
+  --c-gray-600:#475569;
+  --c-gray-700:#334155;
+  --c-gray-800:#1e293b;
+  --c-gray-900:#0f172a;
+
+  /* ── Semantic ── */
+  --c-success:      #15803d;
+  --c-success-50:   #f0fdf4;
+  --c-success-200:  #bbf7d0;
+  --c-success-400:  #4ade80;
+  --c-success-700:  #15803d;
+  --c-success-bg:   #f0fdf4;
+  --c-success-ring: #bbf7d0;
+  --c-warning:      #b45309;
+  --c-warning-bg:   #fffbeb;
+  --c-warning-ring: #fde68a;
+  --c-danger:       #dc2626;
+  --c-danger-300:   #fca5a5;
+  --c-danger-bg:    #fef2f2;
+  --c-danger-ring:  #fecaca;
+  --c-info:         #2563eb;
+  --c-info-bg:      #eff6ff;
+  --c-info-ring:    #bfdbfe;
+
+  /* ── Typography ── */
+  --font: "Inter", "Segoe UI", system-ui, sans-serif;
+  --fs-xs:  11px;
+  --fs-sm:  13px;
+  --fs-base: 14px;
+  --fs-md:  14px;
+  --fs-lg:  16px;
+  --fs-xl:  20px;
+  --fs-2xl: 26px;
+  --fs-3xl: 32px;
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semi:   600;
+  --fw-bold:   700;
+
+  /* ── Spacing ── */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* ── Radii ── */
+  --r-xs:   6px;
+  --r-sm:   8px;
+  --r-md:   12px;
+  --r-lg:   16px;
+  --r-full: 999px;
+
+  /* ── Shadows ── */
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.08), 0 1px 2px -1px rgb(15 23 42 / 0.06);
+  --shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.07), 0 2px 4px -2px rgb(15 23 42 / 0.05);
+  --shadow-lg: 0 10px 24px -3px rgb(15 23 42 / 0.10), 0 4px 8px -4px rgb(15 23 42 / 0.07);
+
+  /* ── Transitions ── */
+  --t-fast:   80ms ease;
+  --t-normal: 160ms ease;
+  --t-slow:   240ms ease;
+
+  /* ── Sidebar ── */
+  --sidebar-w: 256px;
+  --header-h:  64px;
+}
