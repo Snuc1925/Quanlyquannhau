@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, Input, StatusView } from "@/components/ui";
+import { Input, StatusView } from "@/components/ui";
 import { useToast } from "@/app/providers/ToastProvider";
 import { TableMap } from "@/features/reservations/components/TableMap";
 import { PreOrderMenu } from "@/features/reservations/components/PreOrderMenu";
@@ -7,13 +7,28 @@ import { ReservationList } from "@/features/reservations/components/ReservationL
 import { useReservationStore } from "@/features/reservations/store/reservationStore";
 import type { PaymentMethod } from "@/features/reservations/types";
 
+/* ────────────────────────────────────────────────────────
+   Constants
+──────────────────────────────────────────────────────── */
+const STEPS = [
+  { id: 1, label: "Thời Gian" },
+  { id: 2, label: "Chọn Bàn" },
+  { id: 3, label: "Gọi Món" },
+  { id: 4, label: "Xác Nhận" },
+];
+
 const paymentOptions: { label: string; value: PaymentMethod; icon: string }[] = [
   { label: "Tiền mặt",     value: "cash",    icon: "💵" },
   { label: "Chuyển khoản", value: "bank",    icon: "🏦" },
   { label: "Thẻ",          value: "card",    icon: "💳" },
-  { label: "Ví điện tử",   value: "ewallet", icon: "📱" }
+  { label: "Ví điện tử",   value: "ewallet", icon: "📱" },
 ];
 
+const DEPOSIT_RATE = 0.3;
+
+/* ────────────────────────────────────────────────────────
+   Component
+──────────────────────────────────────────────────────── */
 export function ReservationPage() {
   const {
     tables, reservations, menuItems, search,
@@ -22,13 +37,15 @@ export function ReservationPage() {
     searchError, actionError,
     updateSearch, runSearch, selectTable,
     updateContact, setPaymentMethod, updatePreOrder,
-    submitBooking, cancelReservation, sweepExpiries
+    submitBooking, cancelReservation, sweepExpiries,
   } = useReservationStore();
 
   const { pushToast } = useToast();
+  const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [nowTs, setNowTs] = useState(Date.now());
 
+  /* countdown timer */
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNowTs(Date.now());
@@ -53,7 +70,44 @@ export function ReservationPage() {
     [selectedTableId, tables]
   );
 
-  const handleSubmitBooking = async () => {
+  /* pre-order totals */
+  const preOrderTotal = useMemo(() => {
+    const itemMap = new Map(menuItems.map((m) => [m.id, m.price]));
+    return preOrders.reduce(
+      (sum, po) => sum + (itemMap.get(po.menuItemId) ?? 0) * po.quantity,
+      0
+    );
+  }, [preOrders, menuItems]);
+
+  const depositAmount = Math.round(preOrderTotal * DEPOSIT_RATE);
+
+  /* step guards */
+  const canGoStep2 = availableTableIds.length > 0;
+  const canGoStep3 = Boolean(selectedTableId);
+  const canGoStep4 = Boolean(selectedTableId);
+
+  const handleNext = () => {
+    if (step === 1) {
+      if (!canGoStep2) { runSearch(); return; }
+      setStep(2);
+    } else if (step === 2) {
+      if (!canGoStep3) {
+        pushToast({ kind: "error", title: "Chưa chọn bàn", description: "Vui lòng chọn một bàn trước khi tiếp tục." });
+        return;
+      }
+      setStep(3);
+    } else if (step === 3) {
+      setStep(4);
+    }
+  };
+
+  const handleBack = () => setStep((s) => Math.max(1, s - 1));
+
+  const handleSubmit = async () => {
+    if (!contact.fullName.trim() || !contact.phone.trim()) {
+      pushToast({ kind: "error", title: "Thiếu thông tin", description: "Vui lòng nhập họ tên và số điện thoại." });
+      return;
+    }
     setSubmitting(true);
     try {
       await new Promise((r) => window.setTimeout(r, 700));
@@ -61,188 +115,341 @@ export function ReservationPage() {
       pushToast({
         kind: "success",
         title: "🎉 Đặt bàn thành công!",
-        description: `Mã đặt bàn: ${reservation.id.slice(0, 8).toUpperCase()}`
+        description: `Mã đặt bàn: ${reservation.id.slice(0, 8).toUpperCase()}`,
       });
+      setStep(1);
     } catch (err) {
       pushToast({
         kind: "error",
         title: "Không thể xác nhận",
-        description: err instanceof Error ? err.message : "Lỗi không xác định"
+        description: err instanceof Error ? err.message : "Lỗi không xác định",
       });
     } finally {
       setSubmitting(false);
     }
   };
 
+  /* ── helpers ── */
+  const fmt = (n: number) => n.toLocaleString("vi-VN") + "₫";
+  const fmtDt = (dt: string) => {
+    if (!dt) return "—";
+    try {
+      return new Date(dt).toLocaleString("vi-VN", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      });
+    } catch { return dt; }
+  };
+
+  /* ── render ── */
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
-
-      {/* ── STEP 1: Search ── */}
-      <Card
-        title="Tìm bàn khả dụng"
-        subtitle="Chọn thời gian và số lượng khách để xem bàn trống"
-        stepNumber={1}
-        stepDone={availableTableIds.length > 0}
-      >
-        <div className="grid grid-3" style={{ alignItems: "end", gap: "var(--sp-4)" }}>
-          <Input
-            id="bookingDate"
-            type="datetime-local"
-            label="Ngày giờ đặt bàn"
-            value={search.bookingDateTime}
-            onChange={(e) => updateSearch({ bookingDateTime: e.target.value })}
-          />
-          <Input
-            id="guestCount"
-            type="number"
-            min={1}
-            max={20}
-            label="Số lượng khách"
-            value={search.guestCount}
-            onChange={(e) => updateSearch({ guestCount: Number(e.target.value) || 1 })}
-          />
-          <Button onClick={runSearch} size="lg">
-            🔍 Tìm bàn
-          </Button>
+    <div className="wizard-page">
+      {/* ══ Top header ══════════════════════════════ */}
+      <div className="wizard-page-header">
+        <div>
+          <h1 className="wizard-page-title">📅 Đặt Bàn Trước</h1>
+          <p className="wizard-page-sub">Chọn bàn, gọi món và thanh toán đặt cọc để sử dụng</p>
         </div>
+      </div>
 
-        {searchError ? (
-          <div style={{ marginTop: "var(--sp-4)" }}>
-            <StatusView kind="error" title="Không tìm thấy bàn phù hợp" description={searchError} />
-          </div>
-        ) : null}
-      </Card>
-
-      {/* ── STEP 2: Select Table ── */}
-      <Card
-        title="Chọn bàn"
-        subtitle="Nhấn vào bàn trống để chọn · Bàn sẽ được giữ trong 5 phút"
-        stepNumber={2}
-        stepDone={Boolean(selectedTableId)}
-        action={
-          hold ? (
-            <div className="countdown-chip">
-              <span className="dot" />
-              Giữ bàn còn {holdLabel}
+      {/* ══ Stepper ══════════════════════════════════ */}
+      <div className="wizard-stepper">
+        {STEPS.map((s, idx) => {
+          const done = step > s.id;
+          const active = step === s.id;
+          return (
+            <div key={s.id} className={`wizard-step${active ? " active" : ""}${done ? " done" : ""}`}>
+              {idx > 0 && <div className={`wizard-connector${done || active ? " filled" : ""}`} />}
+              <div className="wizard-step-circle">
+                {done ? "✓" : s.id}
+              </div>
+              <span className="wizard-step-label">{s.label}</span>
             </div>
-          ) : null
-        }
-      >
-        {availableTableIds.length === 0 ? (
-          <StatusView
-            kind="empty"
-            title="Chưa tìm bàn"
-            description="Vui lòng hoàn thành bước 1 để xem bàn khả dụng."
-          />
-        ) : (
-          <TableMap
-            tables={tables}
-            availableTableIds={availableTableIds}
-            selectedTableId={selectedTableId}
-            onSelect={selectTable}
-          />
-        )}
+          );
+        })}
+      </div>
 
-        {selectedTable ? (
-          <div style={{
-            marginTop: "var(--sp-4)",
-            padding: "var(--sp-3) var(--sp-4)",
-            background: "var(--c-primary-50)",
-            border: "1px solid var(--c-primary-100)",
-            borderRadius: "var(--r-sm)",
-            fontSize: "var(--fs-sm)",
-            color: "var(--c-primary-700)",
-            fontWeight: "var(--fw-medium)"
-          }}>
-            🪑 Đã chọn bàn <strong>{selectedTable.code}</strong> — tối đa {selectedTable.capacity} khách
+      {/* ══ Body: content + summary ══════════════════ */}
+      <div className="wizard-body">
+
+        {/* ── LEFT: step content ──────────────────── */}
+        <div className="wizard-content">
+
+          {/* STEP 1 */}
+          {step === 1 && (
+            <div className="wizard-step-panel">
+              <div className="wizard-step-heading">
+                <span className="wizard-step-num">1</span>
+                <span>Chọn Thời Gian &amp; Số Người</span>
+              </div>
+              <div className="wizard-fields-grid">
+                <div className="field-group">
+                  <label className="field-label">Ngày giờ <span style={{ color: "#ef4444" }}>*</span></label>
+                  <input
+                    type="datetime-local"
+                    className="field-input"
+                    value={search.bookingDateTime}
+                    onChange={(e) => updateSearch({ bookingDateTime: e.target.value })}
+                  />
+                </div>
+                <div className="field-group">
+                  <label className="field-label">Số lượng khách <span style={{ color: "#ef4444" }}>*</span></label>
+                  <input
+                    type="number"
+                    className="field-input"
+                    min={1}
+                    max={20}
+                    value={search.guestCount}
+                    onChange={(e) => updateSearch({ guestCount: Number(e.target.value) || 1 })}
+                  />
+                </div>
+              </div>
+              {searchError && (
+                <div className="wizard-alert wizard-alert--error">
+                  ⚠️ {searchError}
+                </div>
+              )}
+              {canGoStep2 && (
+                <div className="wizard-alert wizard-alert--success">
+                  ✅ Tìm thấy {availableTableIds.length} bàn khả dụng — hãy chọn bàn ở bước tiếp theo
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 2 */}
+          {step === 2 && (
+            <div className="wizard-step-panel">
+              <div className="wizard-step-heading">
+                <span className="wizard-step-num">2</span>
+                <span>Chọn vị trí bàn</span>
+                {hold && (
+                  <div className="countdown-chip" style={{ marginLeft: "auto" }}>
+                    <span className="dot" />
+                    Giữ bàn còn {holdLabel}
+                  </div>
+                )}
+              </div>
+              <TableMap
+                tables={tables}
+                availableTableIds={availableTableIds}
+                selectedTableId={selectedTableId}
+                onSelect={selectTable}
+              />
+              {actionError && (
+                <div className="wizard-alert wizard-alert--error">
+                  ⚠️ {actionError}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 3 */}
+          {step === 3 && (
+            <div className="wizard-step-panel">
+              <div className="wizard-step-heading">
+                <span className="wizard-step-num">3</span>
+                <span>Gọi Món Trước (tuỳ chọn)</span>
+              </div>
+              <PreOrderMenu
+                menuItems={menuItems}
+                preOrders={preOrders}
+                onChangeQuantity={updatePreOrder}
+              />
+            </div>
+          )}
+
+          {/* STEP 4 */}
+          {step === 4 && (
+            <div className="wizard-step-panel">
+              <div className="wizard-step-heading">
+                <span className="wizard-step-num">4</span>
+                <span>Thông tin khách hàng</span>
+              </div>
+              <div className="wizard-fields-grid">
+                <div className="field-group">
+                  <label className="field-label">Họ và tên <span style={{ color: "#ef4444" }}>*</span></label>
+                  <input
+                    className="field-input"
+                    placeholder="Nguyễn Văn A"
+                    value={contact.fullName}
+                    onChange={(e) => updateContact({ fullName: e.target.value })}
+                  />
+                </div>
+                <div className="field-group">
+                  <label className="field-label">Số điện thoại <span style={{ color: "#ef4444" }}>*</span></label>
+                  <input
+                    className="field-input"
+                    type="tel"
+                    placeholder="09x xxx xxxx"
+                    value={contact.phone}
+                    onChange={(e) => updateContact({ phone: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="field-group" style={{ marginTop: "var(--sp-3)" }}>
+                <label className="field-label">Ghi chú đặc biệt</label>
+                <textarea
+                  className="field-input field-textarea"
+                  rows={3}
+                  placeholder="Ví dụ: không cay, có bé nhỏ, sinh nhật..."
+                  value={contact.note ?? ""}
+                  onChange={(e) => updateContact({ note: e.target.value })}
+                />
+              </div>
+
+              {/* order detail */}
+              {preOrders.length > 0 && (
+                <div className="wizard-order-detail">
+                  <div className="wizard-order-detail-header">
+                    📋 Chi tiết món đã chọn
+                    <button
+                      className="wizard-link-btn"
+                      onClick={() => setStep(3)}
+                    >
+                      Chỉnh sửa
+                    </button>
+                  </div>
+                  {preOrders
+                    .filter((po) => po.quantity > 0)
+                    .map((po) => {
+                      const item = menuItems.find((m) => m.id === po.menuItemId);
+                      if (!item) return null;
+                      return (
+                        <div key={po.menuItemId} className="wizard-order-line">
+                          <span>#{item.name}</span>
+                          <span>×{po.quantity}</span>
+                          <span>{fmt(item.price * po.quantity)}</span>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+
+              {/* payment method */}
+              <div style={{ marginTop: "var(--sp-5)" }}>
+                <p className="field-label" style={{ marginBottom: "var(--sp-3)" }}>
+                  Phương thức thanh toán cọc
+                </p>
+                <div className="payment-grid">
+                  {paymentOptions.map((opt) => (
+                    <button
+                      type="button"
+                      key={opt.value}
+                      className={`payment-option${paymentMethod === opt.value ? " selected" : ""}`}
+                      onClick={() => setPaymentMethod(opt.value)}
+                    >
+                      <span className="payment-icon">{opt.icon}</span>
+                      <span className="payment-label">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Navigation buttons ── */}
+          <div className="wizard-nav">
+            {step > 1 && (
+              <button className="btn btn-outline wizard-back-btn" onClick={handleBack}>
+                ← Quay lại
+              </button>
+            )}
+            <div style={{ flex: 1 }} />
+            {step === 1 && !canGoStep2 && (
+              <button className="btn btn-primary" onClick={() => { runSearch(); }}>
+                🔍 Tìm bàn →
+              </button>
+            )}
+            {step === 1 && canGoStep2 && (
+              <button className="btn btn-primary" onClick={() => setStep(2)}>
+                Tiếp theo →
+              </button>
+            )}
+            {step === 2 && (
+              <button
+                className="btn btn-primary"
+                disabled={!canGoStep3}
+                onClick={handleNext}
+              >
+                Tiếp theo →
+              </button>
+            )}
+            {step === 3 && (
+              <button className="btn btn-primary" onClick={() => setStep(4)}>
+                Tiếp theo →
+              </button>
+            )}
+            {step === 4 && (
+              <button
+                className="btn btn-primary"
+                disabled={submitting}
+                onClick={handleSubmit}
+              >
+                {submitting ? "⏳ Đang xử lý..." : "✅ Xác nhận đặt bàn"}
+              </button>
+            )}
           </div>
-        ) : null}
+        </div>
 
-        {actionError ? (
-          <div style={{ marginTop: "var(--sp-3)" }}>
-            <StatusView kind="error" title="Cảnh báo" description={actionError} />
+        {/* ── RIGHT: booking summary ──────────────── */}
+        <div className="wizard-summary">
+          <div className="wizard-summary-title">📋 Thông Tin Đặt Bàn</div>
+
+          <div className="wizard-summary-rows">
+            <div className="wizard-summary-row">
+              <span className="ws-label">Ngày &amp; giờ</span>
+              <span className="ws-value">{search.bookingDateTime ? fmtDt(search.bookingDateTime) : "—"}</span>
+            </div>
+            <div className="wizard-summary-row">
+              <span className="ws-label">Số khách</span>
+              <span className="ws-value">{search.guestCount} người</span>
+            </div>
+            <div className="wizard-summary-row">
+              <span className="ws-label">Bàn đã chọn</span>
+              <span className="ws-value">
+                {selectedTable
+                  ? <span className="ws-badge">{selectedTable.code}</span>
+                  : <span className="ws-placeholder">Chưa chọn</span>}
+              </span>
+            </div>
+            <div className="wizard-summary-row">
+              <span className="ws-label">Món đã chọn</span>
+              <span className="ws-value">
+                {preOrders.filter((p) => p.quantity > 0).length > 0
+                  ? `${preOrders.filter((p) => p.quantity > 0).length} loại`
+                  : <span className="ws-placeholder">Chưa có món</span>}
+              </span>
+            </div>
           </div>
-        ) : null}
-      </Card>
 
-      {/* ── STEP 3: Pre-order ── */}
-      <PreOrderMenu
-        menuItems={menuItems}
-        preOrders={preOrders}
-        onChangeQuantity={updatePreOrder}
-      />
+          <div className="wizard-summary-divider" />
 
-      {/* ── STEP 4: Contact + Confirm ── */}
-      <Card
-        title="Thông tin liên hệ & Xác nhận"
-        subtitle="Điền thông tin và chọn phương thức đặt cọc"
-        stepNumber={4}
-      >
-        <div className="grid grid-2" style={{ marginBottom: "var(--sp-4)" }}>
-          <Input
-            id="fullName"
-            label="Họ tên khách"
-            value={contact.fullName}
-            onChange={(e) => updateContact({ fullName: e.target.value })}
-            placeholder="Nguyễn Văn A"
-            required
-          />
-          <Input
-            id="phone"
-            label="Số điện thoại"
-            type="tel"
-            value={contact.phone}
-            onChange={(e) => updateContact({ phone: e.target.value })}
-            placeholder="09x xxx xxxx"
-            required
-          />
+          <div className="wizard-summary-totals">
+            <div className="wizard-total-row">
+              <span>Tiền bàn</span>
+              <span>0₫</span>
+            </div>
+            <div className="wizard-total-row">
+              <span>Tiền món ăn</span>
+              <span>{fmt(preOrderTotal)}</span>
+            </div>
+            <div className="wizard-total-row wizard-total-grand">
+              <span>Tổng cộng</span>
+              <span>{fmt(preOrderTotal)}</span>
+            </div>
+          </div>
+
+          <div className="wizard-deposit-box">
+            <span className="ws-label">Tiền cọc (30%)</span>
+            <span className="wizard-deposit-amount">
+              {depositAmount > 0 ? fmt(depositAmount) : "0₫"}
+            </span>
+          </div>
         </div>
-        <Input
-          id="note"
-          label="Ghi chú (tuỳ chọn)"
-          value={contact.note ?? ""}
-          onChange={(e) => updateContact({ note: e.target.value })}
-          placeholder="Không cay, ngồi ngoài trời, sinh nhật..."
-        />
+      </div>
 
-        <div className="divider" />
-
-        {/* Payment picker */}
-        <div className="field-label" style={{ marginBottom: "var(--sp-3)" }}>
-          Phương thức đặt cọc
-        </div>
-        <div className="payment-grid">
-          {paymentOptions.map((opt) => (
-            <button
-              type="button"
-              key={opt.value}
-              className={`payment-option${paymentMethod === opt.value ? " selected" : ""}`}
-              onClick={() => setPaymentMethod(opt.value)}
-            >
-              <span className="payment-icon">{opt.icon}</span>
-              <span className="payment-label">{opt.label}</span>
-            </button>
-          ))}
-        </div>
-
-        <div style={{ marginTop: "var(--sp-5)" }}>
-          <Button
-            size="lg"
-            fullWidth
-            disabled={submitting || !selectedTableId}
-            onClick={handleSubmitBooking}
-          >
-            {submitting ? "⏳ Đang xác nhận..." : "✅ Xác nhận đặt bàn"}
-          </Button>
-          {!selectedTableId ? (
-            <p style={{ textAlign: "center", fontSize: "var(--fs-sm)", color: "var(--c-gray-400)", marginTop: "var(--sp-2)" }}>
-              Vui lòng chọn bàn ở bước 2 trước
-            </p>
-          ) : null}
-        </div>
-      </Card>
-
-      {/* ── Reservation list ── */}
+      {/* ══ Reservation list (below wizard) ══════════ */}
       <ReservationList
         reservations={reservations}
         tables={tables}

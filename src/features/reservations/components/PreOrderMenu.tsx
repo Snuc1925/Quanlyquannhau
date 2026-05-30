@@ -1,4 +1,3 @@
-import { Card } from "@/components/ui";
 import type { MenuItem, PreOrderItem } from "@/features/reservations/types";
 
 type PreOrderMenuProps = {
@@ -18,11 +17,7 @@ export function PreOrderMenu({
   const availableItems = menuItems.filter((item) => item.status === "AVAILABLE");
 
   return (
-    <Card
-      title="Chọn món trước (tuỳ chọn)"
-      subtitle="Chỉ hiển thị món còn hàng · Nhân viên sẽ confirm lại khi đến"
-      stepNumber={3}
-    >
+    <>
       <div className="menu-grid">
         {availableItems.map((item) => {
           const qty = preOrderMap.get(item.id) ?? 0;
@@ -71,6 +66,6 @@ export function PreOrderMenu({
           {preOrders.reduce((sum, o) => sum + o.quantity, 0)} phần
         </div>
       ) : null}
-    </Card>
+    </>
   );
 }

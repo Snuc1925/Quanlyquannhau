@@ -90,10 +90,24 @@
 
   /* ── Transitions ── */
   --t-fast:   80ms ease;
+  --t-base:   160ms ease;
   --t-normal: 160ms ease;
   --t-slow:   240ms ease;
 
   /* ── Sidebar ── */
   --sidebar-w: 256px;
   --header-h:  64px;
+
+  /* ── Semantic aliases (used across UI & wizard) ── */
+  --c-primary:        #174429;
+  --c-secondary:      #ffa827;
+  --c-border:         #e2e8f0;
+  --c-bg:             #f8fafc;
+  --c-surface:        #ffffff;
+  --c-text-primary:   #0f172a;
+  --c-text-secondary: #475569;
+  --c-text-muted:     #94a3b8;
+
+  /* ── Extra radii ── */
+  --r-xl:   20px;
 }
