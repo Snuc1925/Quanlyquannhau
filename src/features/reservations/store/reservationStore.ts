@@ -38,7 +38,8 @@ type ReservationState = {
   setPaymentMethod: (method: PaymentMethod) => void;
   updatePreOrder: (menuItemId: string, quantity: number) => void;
   resetDraft: () => void;
-  submitBooking: () => Reservation;
+  submitBooking: (requestedByRole?: "customer" | "staff" | "manager") => Reservation;
+  approveReservation: (reservationId: string, approverName: string) => void;
   cancelReservation: (reservationId: string, reason: string) => void;
   sweepExpiries: () => void;
 };
@@ -225,7 +226,7 @@ export const useReservationStore = create<ReservationState>((set, get) => ({
     });
   },
 
-  submitBooking: () => {
+  submitBooking: (requestedByRole = "staff") => {
     const state = get();
 
     if (!state.selectedTableId || !state.hold) {
@@ -246,19 +247,22 @@ export const useReservationStore = create<ReservationState>((set, get) => ({
       bookingDateTime: new Date(state.search.bookingDateTime).toISOString(),
       guestCount: state.search.guestCount,
       contact: state.contact,
-      status: "CONFIRMED",
+      status: requestedByRole === "customer" ? "PENDING_STAFF_CONFIRMATION" : "CONFIRMED",
       preOrders: state.preOrders,
       paymentMethod: state.paymentMethod,
       createdAt: new Date().toISOString(),
       checkInDeadline: new Date(
         new Date(state.search.bookingDateTime).getTime() + CHECK_IN_GRACE
-      ).toISOString()
+      ).toISOString(),
+      requestedByRole
     };
 
     set({
       reservations: [...state.reservations, reservation],
       tables: state.tables.map((table) =>
-        table.id === reservation.tableId ? { ...table, status: "BOOKED" } : table
+        table.id === reservation.tableId && reservation.status === "CONFIRMED"
+          ? { ...table, status: "BOOKED" }
+          : table
       ),
       selectedTableId: null,
       hold: null,
@@ -268,6 +272,27 @@ export const useReservationStore = create<ReservationState>((set, get) => ({
     });
 
     return reservation;
+  },
+
+  approveReservation: (reservationId, approverName) => {
+    const state = get();
+    const target = state.reservations.find((item) => item.id === reservationId);
+    if (!target || target.status !== "PENDING_STAFF_CONFIRMATION") {
+      return;
+    }
+
+    const nextReservations = state.reservations.map((item) =>
+      item.id === reservationId
+        ? { ...item, status: "CONFIRMED", confirmedBy: approverName }
+        : item
+    );
+
+    set({
+      reservations: nextReservations,
+      tables: state.tables.map((table) =>
+        table.id === target.tableId ? { ...table, status: "BOOKED" } : table
+      )
+    });
   },
 
   cancelReservation: (reservationId, reason) => {

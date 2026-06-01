@@ -12,6 +12,7 @@ import { RevenuePage } from "@/features/revenue/pages/RevenuePage";
 import { StaffPage } from "@/features/staff/pages/StaffPage";
 import { MenuPage } from "@/features/menu/pages/MenuPage";
 import { RidePage } from "@/features/rides/pages/RidePage";
+import { RideConfirmPage } from "@/features/rides/pages/RideConfirmPage";
 import { OrderPage } from "@/features/orders/pages/OrderPage";
 
 export function AppRouter() {
@@ -92,6 +93,7 @@ export function AppRouter() {
               }
             />
             <Route path="customer/reservations" element={<ReservationPage />} />
+            <Route path="customer/rides/confirm" element={<RideConfirmPage />} />
           </Route>
         </Route>
       </Route>

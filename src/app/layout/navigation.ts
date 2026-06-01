@@ -27,7 +27,8 @@ const navigationMap: Record<UserRole, NavigationItem[]> = {
     { label: "Gọi món",  to: "/staff/orders",       icon: "🍻" }
   ],
   customer: [
-    { label: "Đặt bàn",   to: "/customer/reservations", icon: "📅" }
+    { label: "Đặt bàn",   to: "/customer/reservations", icon: "📅" },
+    { label: "Đặt xe",    to: "/customer/rides/confirm", icon: "🚖" }
   ]
 };
 

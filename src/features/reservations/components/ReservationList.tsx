@@ -12,6 +12,7 @@ const statusMap: Record<
   Reservation["status"],
   { label: string; variant: "default" | "success" | "warning" | "danger" | "info" }
 > = {
+  PENDING_STAFF_CONFIRMATION: { label: "🕒 Chờ nhân viên xác nhận", variant: "info" },
   PENDING_DEPOSIT: { label: "⏳ Chờ cọc",  variant: "warning" },
   CONFIRMED:       { label: "✅ Đã đặt",   variant: "success" },
   CANCELLED:       { label: "❌ Đã hủy",   variant: "danger"  },

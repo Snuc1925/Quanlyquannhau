@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/app/providers/ToastProvider";
+import { useAuthStore } from "@/features/auth/store/authStore";
 import { TableMap } from "@/features/reservations/components/TableMap";
 import { PreOrderMenu } from "@/features/reservations/components/PreOrderMenu";
 import { useReservationStore } from "@/features/reservations/store/reservationStore";
@@ -14,6 +15,7 @@ const paymentOptions: { label: string; value: PaymentMethod; icon: string }[] = 
 
 const statusMeta: Record<Reservation["status"], { label: string; className: string }> = {
   CONFIRMED: { label: "✅ Đã đặt", className: "resv-badge-confirmed" },
+  PENDING_STAFF_CONFIRMATION: { label: "🕒 Chờ nhân viên xác nhận", className: "resv-badge-staff-pending" },
   PENDING_DEPOSIT: { label: "⏳ Chờ cọc", className: "resv-badge-pending" },
   CANCELLED: { label: "❌ Đã hủy", className: "resv-badge-cancelled" },
   EXPIRED: { label: "⚠️ Quá hạn", className: "resv-badge-expired" }
@@ -43,9 +45,11 @@ export function ReservationPage() {
     updatePreOrder,
     resetDraft,
     submitBooking,
+    approveReservation,
     cancelReservation,
     sweepExpiries
   } = useReservationStore();
+  const session = useAuthStore((state) => state.session);
 
   const { pushToast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -53,6 +57,9 @@ export function ReservationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [nowTs, setNowTs] = useState(Date.now());
   const [listQuery, setListQuery] = useState("");
+  const role = session?.role ?? "customer";
+  const isCustomer = role === "customer";
+  const canApproveRequests = role === "staff" || role === "manager";
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -100,6 +107,14 @@ export function ReservationPage() {
       );
     });
   }, [listQuery, sortedReservations, tableCodeMap]);
+
+  const pendingCustomerRequests = useMemo(
+    () =>
+      reservations.filter(
+        (reservation) => reservation.status === "PENDING_STAFF_CONFIRMATION"
+      ),
+    [reservations]
+  );
 
   const holdSecondsLeft = useMemo(() => {
     if (!hold) return 0;
@@ -164,11 +179,13 @@ export function ReservationPage() {
     setSubmitting(true);
     try {
       await new Promise((resolve) => window.setTimeout(resolve, 700));
-      const reservation = submitBooking();
+      const reservation = submitBooking(role);
       pushToast({
         kind: "success",
-        title: "🎉 Đặt bàn thành công!",
-        description: `Mã đặt bàn: ${reservation.id.slice(0, 8).toUpperCase()}`
+        title: isCustomer ? "📨 Đã gửi yêu cầu đặt bàn" : "🎉 Đặt bàn thành công!",
+        description: isCustomer
+          ? "Nhân viên sẽ xác nhận trong màn hình quản lý đặt bàn."
+          : `Mã đặt bàn: ${reservation.id.slice(0, 8).toUpperCase()}`
       });
       setIsModalOpen(false);
       setStep(1);
@@ -187,90 +204,150 @@ export function ReservationPage() {
     <div className="resv-page">
       <div className="resv-page-header">
         <div>
-          <h2 className="resv-title">Danh sách đặt bàn</h2>
+          <h2 className="resv-title">{isCustomer ? "Đặt bàn" : "Danh sách đặt bàn"}</h2>
           <p className="resv-subtitle">
-            Quản lý lịch đặt bàn trước và tạo đơn đặt bàn mới cho khách
+            {isCustomer
+              ? "Tạo yêu cầu đặt bàn, nhân viên sẽ xác nhận để chốt bàn cho bạn"
+              : "Quản lý lịch đặt bàn trước và xử lý yêu cầu đặt từ khách hàng"}
           </p>
         </div>
         <button type="button" className="resv-btn-primary" onClick={openCreateModal}>
           <span className="resv-btn-icon">＋</span>
-          Tạo đơn đặt bàn mới
+          {isCustomer ? "Đặt bàn ngay" : "Tạo đơn đặt bàn mới"}
         </button>
       </div>
 
-      <div className="resv-table-wrap">
-        <div className="resv-table-toolbar">
-          <div className="resv-search-box">
-            <span className="resv-search-icon">🔍</span>
-            <input
-              type="text"
-              placeholder="Tìm theo khách hàng / số điện thoại / mã bàn..."
-              value={listQuery}
-              onChange={(e) => setListQuery(e.target.value)}
-            />
-          </div>
-          <span className="resv-table-count">{filteredReservations.length} đơn</span>
+      {isCustomer ? (
+        <div className="resv-customer-only">
+          <p>Khách hàng chỉ tạo yêu cầu đặt bàn, danh sách đặt bàn sẽ do nhân viên quản lý và xác nhận.</p>
         </div>
-        <table className="resv-table">
-          <thead>
-            <tr>
-              <th>Khách hàng</th>
-              <th>Bàn</th>
-              <th>Giờ hẹn</th>
-              <th>Số khách</th>
-              <th>Trạng thái</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredReservations.map((reservation) => (
-              <tr key={reservation.id}>
-                <td>
-                  <div className="resv-customer-name">{reservation.contact.fullName}</div>
-                  <div className="resv-customer-phone">{reservation.contact.phone}</div>
-                </td>
-                <td className="resv-table-code">
-                  {tableCodeMap.get(reservation.tableId) ?? reservation.tableId}
-                </td>
-                <td>{formatDateTime(reservation.bookingDateTime)}</td>
-                <td>{reservation.guestCount} người</td>
-                <td>
-                  <span className={`resv-badge ${statusMeta[reservation.status].className}`}>
-                    {statusMeta[reservation.status].label}
-                  </span>
-                </td>
-                <td>
-                  {reservation.status === "CONFIRMED" ? (
+      ) : (
+        <>
+          {canApproveRequests && pendingCustomerRequests.length > 0 ? (
+            <div className="resv-pending-wrap">
+              <div className="resv-pending-title">
+                📨 Yêu cầu từ khách hàng chờ xác nhận ({pendingCustomerRequests.length})
+              </div>
+              <div className="resv-pending-list">
+                {pendingCustomerRequests.map((reservation) => (
+                  <div className="resv-pending-item" key={reservation.id}>
+                    <div>
+                      <div className="resv-customer-name">{reservation.contact.fullName}</div>
+                      <div className="resv-customer-phone">
+                        {reservation.contact.phone} · {tableCodeMap.get(reservation.tableId) ?? reservation.tableId} ·{" "}
+                        {formatDateTime(reservation.bookingDateTime)}
+                      </div>
+                    </div>
                     <button
                       type="button"
-                      className="resv-link-cancel"
+                      className="resv-link-approve"
                       onClick={() => {
-                        cancelReservation(reservation.id, "Khách chủ động hủy bàn");
+                        approveReservation(reservation.id, session?.username ?? "staff");
                         pushToast({
-                          kind: "info",
-                          title: "Đã hủy đặt bàn",
-                          description: "Bàn đã được trả về trạng thái Trống."
+                          kind: "success",
+                          title: "Đã xác nhận yêu cầu",
+                          description: "Đơn đặt bàn đã chuyển sang trạng thái Đã đặt."
                         });
                       }}
                     >
-                      Hủy bàn
+                      Xác nhận
                     </button>
-                  ) : (
-                    <span className="resv-cancel-reason">{reservation.cancelReason ?? "—"}</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {filteredReservations.length === 0 ? (
-              <tr>
-                <td className="resv-empty-cell" colSpan={6}>
-                  Chưa có lịch đặt bàn phù hợp
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="resv-table-wrap">
+            <div className="resv-table-toolbar">
+              <div className="resv-search-box">
+                <span className="resv-search-icon">🔍</span>
+                <input
+                  type="text"
+                  placeholder="Tìm theo khách hàng / số điện thoại / mã bàn..."
+                  value={listQuery}
+                  onChange={(e) => setListQuery(e.target.value)}
+                />
+              </div>
+              <span className="resv-table-count">{filteredReservations.length} đơn</span>
+            </div>
+            <table className="resv-table">
+              <thead>
+                <tr>
+                  <th>Khách hàng</th>
+                  <th>Bàn</th>
+                  <th>Giờ hẹn</th>
+                  <th>Số khách</th>
+                  <th>Trạng thái</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredReservations.map((reservation) => (
+                  <tr key={reservation.id}>
+                    <td>
+                      <div className="resv-customer-name">{reservation.contact.fullName}</div>
+                      <div className="resv-customer-phone">{reservation.contact.phone}</div>
+                    </td>
+                    <td className="resv-table-code">
+                      {tableCodeMap.get(reservation.tableId) ?? reservation.tableId}
+                    </td>
+                    <td>{formatDateTime(reservation.bookingDateTime)}</td>
+                    <td>{reservation.guestCount} người</td>
+                    <td>
+                      <span className={`resv-badge ${statusMeta[reservation.status].className}`}>
+                        {statusMeta[reservation.status].label}
+                      </span>
+                    </td>
+                    <td>
+                      {reservation.status === "PENDING_STAFF_CONFIRMATION" && canApproveRequests ? (
+                        <button
+                          type="button"
+                          className="resv-link-approve"
+                          onClick={() => {
+                            approveReservation(reservation.id, session?.username ?? "staff");
+                            pushToast({
+                              kind: "success",
+                              title: "Đã xác nhận yêu cầu",
+                              description: "Đơn đặt bàn đã chuyển sang trạng thái Đã đặt."
+                            });
+                          }}
+                        >
+                          Xác nhận
+                        </button>
+                      ) : reservation.status === "CONFIRMED" ? (
+                        <button
+                          type="button"
+                          className="resv-link-cancel"
+                          onClick={() => {
+                            cancelReservation(reservation.id, "Khách chủ động hủy bàn");
+                            pushToast({
+                              kind: "info",
+                              title: "Đã hủy đặt bàn",
+                              description: "Bàn đã được trả về trạng thái Trống."
+                            });
+                          }}
+                        >
+                          Hủy bàn
+                        </button>
+                      ) : (
+                        <span className="resv-cancel-reason">{reservation.cancelReason ?? "—"}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {filteredReservations.length === 0 ? (
+                  <tr>
+                    <td className="resv-empty-cell" colSpan={6}>
+                      Chưa có lịch đặt bàn phù hợp
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       <div
         className={`resv-modal-backdrop${isModalOpen ? " open" : ""}`}

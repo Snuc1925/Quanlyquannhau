@@ -61,4 +61,16 @@ export const mockRides: RideRequest[] = [
     createdAt: "2026-05-30T22:55:00",
     staffName: "Nguyễn Văn C",
   },
+  {
+    id: "r-06",
+    tableNo: "A01",
+    customerName: "Khách Demo",
+    customerPhone: "0901 234 567",
+    destination: "25 Nguyễn Bỉnh Khiêm, Q.1, TP.HCM",
+    note: "Khách nhờ hỗ trợ đến bãi giữ xe",
+    rideApp: "be",
+    status: "dispatched",
+    createdAt: "2026-06-01T15:45:00",
+    staffName: "Nhân viên",
+  },
 ];

@@ -34,6 +34,25 @@ export const mockReservations: Reservation[] = [
     preOrders: [],
     paymentMethod: "bank",
     createdAt: new Date().toISOString(),
-    checkInDeadline: new Date(Date.now() + 75 * 60 * 1000).toISOString()
+    checkInDeadline: new Date(Date.now() + 75 * 60 * 1000).toISOString(),
+    requestedByRole: "staff",
+    confirmedBy: "staff"
+  },
+  {
+    id: "r-seeded-customer-pending",
+    tableId: "t2",
+    bookingDateTime: new Date(Date.now() + 95 * 60 * 1000).toISOString(),
+    guestCount: 4,
+    contact: {
+      fullName: "Trần Thị B",
+      phone: "0911222333",
+      note: "Khách đặt online, chờ nhân viên xác nhận"
+    },
+    status: "PENDING_STAFF_CONFIRMATION",
+    preOrders: [{ menuItemId: "m1", quantity: 6 }],
+    paymentMethod: "ewallet",
+    createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    checkInDeadline: new Date(Date.now() + 125 * 60 * 1000).toISOString(),
+    requestedByRole: "customer"
   }
 ];

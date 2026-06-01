@@ -1,6 +1,7 @@
 export type TableStatus = "EMPTY" | "HELD" | "BOOKED" | "IN_USE";
 export type ReservationStatus =
   | "PENDING_DEPOSIT"
+  | "PENDING_STAFF_CONFIRMATION"
   | "CONFIRMED"
   | "CANCELLED"
   | "EXPIRED";
@@ -44,6 +45,8 @@ export type Reservation = {
   createdAt: string;
   checkInDeadline: string;
   cancelReason?: string;
+  requestedByRole?: "customer" | "staff" | "manager";
+  confirmedBy?: string;
 };
 
 export type TableHold = {
