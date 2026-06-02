@@ -21,6 +21,7 @@ type RevenueActions = {
   checkOpenTables: () => boolean;
   calculateSystemSummary: () => PaymentSummary[];
   confirmClosing: (type: "SHIFT" | "DAY", closedBy: string) => ClosingRecord;
+  approveClosing: (id: string, approvedBy: string) => void;
   getOpenInvoices: () => Invoice[];
   getClosedInvoices: () => Invoice[];
 };
@@ -37,7 +38,27 @@ const initialDraft: ReconciliationDraft = {
 export const useRevenueStore = create<RevenueState & RevenueActions>(
   (set, get) => ({
     invoices: mockInvoices,
-    closings: [],
+    closings: [
+      {
+        id: "close-demo-001",
+        type: "SHIFT",
+        closedAt: "2026-05-30T18:00:00",
+        closedBy: "Nguyễn Thị Kế Toán",
+        openingCashFund: 500000,
+        invoiceCount: 3,
+        paymentSummaries: [
+          { method: "cash", systemAmount: 583000, actualAmount: 583000, discrepancy: 0 },
+          { method: "bank", systemAmount: 514800, actualAmount: 514800, discrepancy: 0 },
+          { method: "card", systemAmount: 390500, actualAmount: 390500, discrepancy: 0 },
+          { method: "ewallet", systemAmount: 0, actualAmount: 0, discrepancy: 0 },
+        ],
+        grandTotal: 1488300,
+        actualGrandTotal: 1488300,
+        discrepancyTotal: 0,
+        notes: "Ca chiều, khớp số liệu",
+        status: "PENDING_APPROVAL",
+      },
+    ],
     draft: initialDraft,
     hasOpenTables: false,
 
@@ -135,7 +156,7 @@ export const useRevenueStore = create<RevenueState & RevenueActions>(
         actualGrandTotal,
         discrepancyTotal,
         notes: draft.notes,
-        status: "CONFIRMED",
+        status: "PENDING_APPROVAL",
       };
 
       // Lock all PAID invoices → CLOSED
@@ -153,6 +174,16 @@ export const useRevenueStore = create<RevenueState & RevenueActions>(
       });
 
       return newClosing;
+    },
+
+    approveClosing: (id, approvedBy) => {
+      set((state) => ({
+        closings: state.closings.map((c) =>
+          c.id === id
+            ? { ...c, status: "APPROVED" as const, approvedBy, approvedAt: new Date().toISOString() }
+            : c
+        ),
+      }));
     },
 
     getOpenInvoices: () => {

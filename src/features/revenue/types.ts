@@ -38,7 +38,9 @@ export type ClosingRecord = {
   actualGrandTotal: number;
   discrepancyTotal: number;
   notes: string;
-  status: "DRAFT" | "CONFIRMED";
+  status: "DRAFT" | "CONFIRMED" | "PENDING_APPROVAL" | "APPROVED";
+  approvedBy?: string;
+  approvedAt?: string;
 };
 
 export type ReconciliationDraft = {
